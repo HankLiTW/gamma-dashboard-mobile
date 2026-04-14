@@ -1,4 +1,4 @@
-const CFG = {
+var CFG = {
   bg: "#171c25",
   text: "#f2f3f5",
   grid: "#2d3646",
@@ -12,7 +12,7 @@ const CFG = {
   medium: "#f39c12",
 };
 
-const TAB_HINTS = {
+var TAB_HINTS = {
   levels:
     "Levels Map: bars are call/put gamma by strike, and green line is net gamma. Use spot/call wall/put wall/flip vertical lines as your key levels.",
   flip:
@@ -27,310 +27,411 @@ const TAB_HINTS = {
     "Gamma Heatmap: strike on Y, run time on X, blue=positive gamma, red=negative gamma; black line is spot path.",
 };
 
-const state = {
+var state = {
   payload: null,
   symbol: null,
   bucket: "core",
   activeTab: "levels",
-  selectedExpirations: new Set(),
+  selectedExpirations: [],
   expTouched: false,
 };
 
-const toNum = (val) => {
-  const n = Number(val);
-  return Number.isFinite(n) ? n : null;
-};
+function toNum(val) {
+  var n = Number(val);
+  return isFinite(n) ? n : null;
+}
 
-const safeText = (val) => {
+function safeText(val) {
   if (val === null || val === undefined) return "";
   return String(val);
-};
+}
 
-const fmtNum = (val, digits = 2) => {
-  const n = toNum(val);
+function fmtNum(val, digits) {
+  var d = typeof digits === "number" ? digits : 2;
+  var n = toNum(val);
   if (n === null) return "N/A";
   return n.toLocaleString(undefined, {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: digits,
+    maximumFractionDigits: d,
+    minimumFractionDigits: d,
   });
-};
+}
 
-const fmtBn = (val) => {
-  const n = toNum(val);
+function fmtBn(val) {
+  var n = toNum(val);
   if (n === null) return "N/A";
-  return `${(n / 1e9).toFixed(2)} Bn`;
-};
+  return (n / 1e9).toFixed(2) + " Bn";
+}
 
-const fmtInt = (val) => {
-  const n = toNum(val);
+function fmtInt(val) {
+  var n = toNum(val);
   if (n === null) return "N/A";
   return Math.round(n).toLocaleString();
-};
+}
 
-const fmtExp = (val) => {
-  const raw = safeText(val).trim();
+function fmtExp(val) {
+  var raw = safeText(val).trim();
   if (!raw) return "-";
   try {
-    const dt = new Date(`${raw}T00:00:00`);
-    if (Number.isNaN(dt.getTime())) return raw;
-    const mm = String(dt.getMonth() + 1).padStart(2, "0");
-    const dd = String(dt.getDate()).padStart(2, "0");
-    const yy = String(dt.getFullYear()).slice(-2);
-    return `${mm}/${dd}/${yy}`;
-  } catch {
+    var dt = new Date(raw + "T00:00:00");
+    if (isNaN(dt.getTime())) return raw;
+    var mm = String(dt.getMonth() + 1);
+    if (mm.length < 2) mm = "0" + mm;
+    var dd = String(dt.getDate());
+    if (dd.length < 2) dd = "0" + dd;
+    var yy = String(dt.getFullYear()).slice(-2);
+    return mm + "/" + dd + "/" + yy;
+  } catch (e) {
     return raw;
   }
-};
+}
 
-const parseTime = (val) => {
+function parseTime(val) {
   if (!val) return null;
-  const dt = new Date(val);
-  return Number.isNaN(dt.getTime()) ? null : dt;
-};
+  var dt = new Date(val);
+  return isNaN(dt.getTime()) ? null : dt;
+}
 
-const baseLayout = (titleX, titleY) => ({
-  margin: { l: 64, r: 18, t: 20, b: 46 },
-  xaxis: {
-    title: titleX,
-    gridcolor: CFG.grid,
-    zeroline: true,
-    zerolinecolor: "#7b8798",
-    zerolinewidth: 1,
-  },
-  yaxis: {
-    title: titleY,
-    gridcolor: CFG.grid,
-    zeroline: true,
-    zerolinecolor: "#7b8798",
-    zerolinewidth: 1,
-  },
-  dragmode: "pan",
-  paper_bgcolor: CFG.bg,
-  plot_bgcolor: CFG.bg,
-  font: { color: CFG.text },
-  legend: { orientation: "h" },
-};
+function baseLayout(titleX, titleY) {
+  return {
+    margin: { l: 64, r: 18, t: 20, b: 46 },
+    xaxis: {
+      title: titleX,
+      gridcolor: CFG.grid,
+      zeroline: true,
+      zerolinecolor: "#7b8798",
+      zerolinewidth: 1,
+    },
+    yaxis: {
+      title: titleY,
+      gridcolor: CFG.grid,
+      zeroline: true,
+      zerolinecolor: "#7b8798",
+      zerolinewidth: 1,
+    },
+    dragmode: "pan",
+    paper_bgcolor: CFG.bg,
+    plot_bgcolor: CFG.bg,
+    font: { color: CFG.text },
+    legend: { orientation: "h" },
+  };
+}
 
-const baseConfig = {
+var baseConfig = {
   responsive: true,
   displaylogo: false,
   scrollZoom: true,
   doubleClick: "reset",
 };
 
+function copyObj(src) {
+  var out = {};
+  if (!src) return out;
+  for (var k in src) {
+    if (Object.prototype.hasOwnProperty.call(src, k)) out[k] = src[k];
+  }
+  return out;
+}
+
+function uniqueSorted(arr) {
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < arr.length; i++) {
+    var key = String(arr[i]);
+    if (!seen[key]) {
+      seen[key] = true;
+      out.push(arr[i]);
+    }
+  }
+  out.sort();
+  return out;
+}
+
+function hasSelectedExp(exp) {
+  return state.selectedExpirations.indexOf(exp) >= 0;
+}
+
+function addSelectedExp(exp) {
+  if (!hasSelectedExp(exp)) state.selectedExpirations.push(exp);
+}
+
+function removeSelectedExp(exp) {
+  var idx = state.selectedExpirations.indexOf(exp);
+  if (idx >= 0) state.selectedExpirations.splice(idx, 1);
+}
+
+function setSelectedExpList(list) {
+  state.selectedExpirations = list.slice();
+}
+
 function getSymbols() {
-  const root = state.payload || {};
-  const symbolsRaw = Array.isArray(root.symbols) ? root.symbols : [];
-  const symbols = symbolsRaw.map((item) => safeText(item.symbol).toUpperCase()).filter(Boolean);
-  return symbols.sort();
+  var root = state.payload || {};
+  var symbolsRaw = Array.isArray(root.symbols) ? root.symbols : [];
+  var symbols = [];
+  for (var i = 0; i < symbolsRaw.length; i++) {
+    var sym = safeText(symbolsRaw[i].symbol).toUpperCase();
+    if (sym) symbols.push(sym);
+  }
+  symbols.sort();
+  return symbols;
 }
 
-function getSymbolEntry(sym = state.symbol) {
-  const root = state.payload || {};
-  const symbols = Array.isArray(root.symbols) ? root.symbols : [];
-  return symbols.find((item) => safeText(item.symbol).toUpperCase() === safeText(sym).toUpperCase()) || null;
+function getSymbolEntry(sym) {
+  var target = safeText(sym || state.symbol).toUpperCase();
+  var root = state.payload || {};
+  var symbols = Array.isArray(root.symbols) ? root.symbols : [];
+  for (var i = 0; i < symbols.length; i++) {
+    if (safeText(symbols[i].symbol).toUpperCase() === target) return symbols[i];
+  }
+  return null;
 }
 
-function getBucketData(symbolEntry, bucket = state.bucket) {
-  const buckets = symbolEntry && symbolEntry.buckets ? symbolEntry.buckets : {};
-  if (buckets[bucket]) return buckets[bucket];
+function getBucketData(symbolEntry, bucket) {
+  var b = bucket || state.bucket;
+  var buckets = symbolEntry && symbolEntry.buckets ? symbolEntry.buckets : {};
+  if (buckets[b]) return buckets[b];
   if (buckets.core) return buckets.core;
-  const keys = Object.keys(buckets);
-  return keys.length ? buckets[keys[0]] : {};
+  for (var k in buckets) {
+    if (Object.prototype.hasOwnProperty.call(buckets, k)) return buckets[k];
+  }
+  return {};
 }
 
-function getMetric(symbolEntry, bucket = state.bucket) {
-  const bucketData = getBucketData(symbolEntry, bucket);
-  return bucketData && bucketData.metric ? bucketData.metric : {};
+function getMetric(symbolEntry, bucket) {
+  var data = getBucketData(symbolEntry, bucket);
+  return data && data.metric ? data.metric : {};
 }
 
 function getDefaultPriceRange(spot) {
-  const s = toNum(spot);
+  var s = toNum(spot);
   if (s === null || s <= 0) return null;
   return [s * 0.95, s * 1.05];
 }
 
 function sourceBadgeClass(source) {
-  const src = safeText(source).toLowerCase();
-  if (src.includes("ibkr") && src.includes("yahoo")) return "mix";
-  if (src.includes("ibkr")) return "ibkr";
-  if (src.includes("yahoo")) return "yahoo";
+  var src = safeText(source).toLowerCase();
+  if (src.indexOf("ibkr") >= 0 && src.indexOf("yahoo") >= 0) return "mix";
+  if (src.indexOf("ibkr") >= 0) return "ibkr";
+  if (src.indexOf("yahoo") >= 0) return "yahoo";
   return "ibkr";
 }
 
 function sourceBadgeText(source) {
-  const src = safeText(source).toLowerCase();
-  if (src.includes("ibkr") && src.includes("yahoo")) return "I+Y";
-  if (src.includes("yahoo")) return "Y";
-  if (src.includes("ibkr")) return "I";
+  var src = safeText(source).toLowerCase();
+  if (src.indexOf("ibkr") >= 0 && src.indexOf("yahoo") >= 0) return "I+Y";
+  if (src.indexOf("yahoo") >= 0) return "Y";
+  if (src.indexOf("ibkr") >= 0) return "I";
   return "?";
 }
 
+function safePlot(targetId, traces, layout, config) {
+  if (typeof Plotly === "undefined" || !Plotly.newPlot) {
+    var meta = document.getElementById("metaLine");
+    if (meta && meta.textContent.indexOf("Plotly") === -1) {
+      meta.textContent = "UI loaded, but chart library failed to load (Plotly). Try refresh or switch network.";
+    }
+    return;
+  }
+  Plotly.newPlot(targetId, traces, layout, config);
+}
+
 function renderMeta() {
-  const root = state.payload || {};
-  const meta = root.meta || {};
-  const finishedAt = parseTime(meta.finished_at);
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
-  const finishedText = finishedAt ? finishedAt.toLocaleString() : safeText(meta.finished_at || "-");
-  const line = document.getElementById("metaLine");
-  line.textContent = `Run #${meta.run_id || "-"} | Last ${finishedText} (${tz}) | Success ${meta.success_count || 0} | Failed ${meta.failure_count || 0}`;
+  var root = state.payload || {};
+  var meta = root.meta || {};
+  var finishedAt = parseTime(meta.finished_at);
+  var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
+  var finishedText = finishedAt ? finishedAt.toLocaleString() : safeText(meta.finished_at || "-");
+  var line = document.getElementById("metaLine");
+  line.textContent =
+    "Run #" + (meta.run_id || "-") +
+    " | Last " + finishedText + " (" + tz + ")" +
+    " | Success " + (meta.success_count || 0) +
+    " | Failed " + (meta.failure_count || 0);
 }
 
 function renderSymbolSelect() {
-  const symbols = getSymbols();
-  const sel = document.getElementById("symbolSelect");
-  sel.innerHTML = symbols.map((sym) => `<option value="${sym}">${sym}</option>`).join("");
-  if (!state.symbol || !symbols.includes(state.symbol)) {
-    state.symbol = symbols[0] || null;
-    state.selectedExpirations = new Set();
+  var symbols = getSymbols();
+  var sel = document.getElementById("symbolSelect");
+  var html = "";
+  for (var i = 0; i < symbols.length; i++) {
+    html += '<option value="' + symbols[i] + '">' + symbols[i] + "</option>";
+  }
+  sel.innerHTML = html;
+
+  if (!state.symbol || symbols.indexOf(state.symbol) < 0) {
+    state.symbol = symbols.length ? symbols[0] : null;
+    state.selectedExpirations = [];
     state.expTouched = false;
   }
   sel.value = state.symbol || "";
 }
 
 function renderSnapshotTable() {
-  const body = document.getElementById("snapshotBody");
-  const symbols = getSymbols();
-  const rows = [];
+  var body = document.getElementById("snapshotBody");
+  var symbols = getSymbols();
+  var html = "";
 
-  for (const sym of symbols) {
-    const entry = getSymbolEntry(sym);
-    const metric = getMetric(entry, state.bucket);
-    const source = entry ? entry.source : null;
-    const badgeCls = sourceBadgeClass(source);
-    const badgeText = sourceBadgeText(source);
-    const activeCls = sym === state.symbol ? "active" : "";
-    rows.push(`
-      <tr data-symbol="${sym}" class="${activeCls}">
-        <td class="symbol-cell">${sym}</td>
-        <td><span class="badge ${badgeCls}" title="${safeText(source) || "unknown"}">${badgeText}</span></td>
-        <td>${fmtNum(metric.spot)}</td>
-        <td>${safeText(metric.sign || "N/A")}</td>
-        <td>${fmtBn(metric.net_gex)}</td>
-        <td>${fmtNum(metric.call_wall)}</td>
-        <td>${fmtNum(metric.put_wall)}</td>
-        <td>${fmtNum(metric.flip_price)}</td>
-      </tr>
-    `);
+  for (var i = 0; i < symbols.length; i++) {
+    var sym = symbols[i];
+    var entry = getSymbolEntry(sym);
+    var metric = getMetric(entry, state.bucket);
+    var source = entry ? entry.source : null;
+    var badgeCls = sourceBadgeClass(source);
+    var badgeText = sourceBadgeText(source);
+    var activeCls = sym === state.symbol ? "active" : "";
+
+    html +=
+      '<tr data-symbol="' + sym + '" class="' + activeCls + '">' +
+      '<td class="symbol-cell">' + sym + "</td>" +
+      '<td><span class="badge ' + badgeCls + '" title="' + (safeText(source) || "unknown") + '">' + badgeText + "</span></td>" +
+      "<td>" + fmtNum(metric.spot) + "</td>" +
+      "<td>" + safeText(metric.sign || "N/A") + "</td>" +
+      "<td>" + fmtBn(metric.net_gex) + "</td>" +
+      "<td>" + fmtNum(metric.call_wall) + "</td>" +
+      "<td>" + fmtNum(metric.put_wall) + "</td>" +
+      "<td>" + fmtNum(metric.flip_price) + "</td>" +
+      "</tr>";
   }
 
-  body.innerHTML = rows.join("");
-  body.querySelectorAll("tr[data-symbol]").forEach((row) => {
-    row.addEventListener("click", () => {
-      const symbol = safeText(row.dataset.symbol).toUpperCase();
+  body.innerHTML = html;
+
+  var rows = body.querySelectorAll("tr[data-symbol]");
+  for (var r = 0; r < rows.length; r++) {
+    rows[r].addEventListener("click", function () {
+      var symbol = safeText(this.getAttribute("data-symbol")).toUpperCase();
       state.symbol = symbol;
-      state.selectedExpirations = new Set();
+      state.selectedExpirations = [];
       state.expTouched = false;
       document.getElementById("symbolSelect").value = symbol;
       renderAll();
     });
-  });
+  }
 
-  const activeEntry = getSymbolEntry();
-  const note = document.getElementById("leftNote");
-  const msg = safeText(activeEntry && activeEntry.error ? activeEntry.error : "").trim();
-  note.textContent = msg || `Loaded ${symbols.length} symbol(s).`;
+  var activeEntry = getSymbolEntry();
+  var note = document.getElementById("leftNote");
+  var msg = safeText(activeEntry && activeEntry.error ? activeEntry.error : "").trim();
+  note.textContent = msg || "Loaded " + symbols.length + " symbol(s).";
 }
 
 function renderCards(symbolEntry, bucketData) {
-  const metric = bucketData && bucketData.metric ? bucketData.metric : {};
-  const oi = symbolEntry && symbolEntry.oi_summary ? symbolEntry.oi_summary : {};
-  const source = safeText(symbolEntry && symbolEntry.source ? symbolEntry.source : "unknown");
-  document.getElementById("cardSpot").textContent = `Spot: ${fmtNum(metric.spot)}`;
-  document.getElementById("cardSign").textContent = `Sign: ${safeText(metric.sign || "N/A")} | Net ${fmtBn(metric.net_gex)}`;
-  document.getElementById("cardFlip").textContent = `Flip: ${fmtNum(metric.flip_price)} | Source: ${source}`;
-  document.getElementById("cardWalls").textContent = `CallW ${fmtNum(metric.call_wall)} | PutW ${fmtNum(metric.put_wall)} | OI ${fmtInt(oi.contracts)}`;
+  var metric = bucketData && bucketData.metric ? bucketData.metric : {};
+  var oi = symbolEntry && symbolEntry.oi_summary ? symbolEntry.oi_summary : {};
+  var source = safeText(symbolEntry && symbolEntry.source ? symbolEntry.source : "unknown");
+
+  document.getElementById("cardSpot").textContent = "Spot: " + fmtNum(metric.spot);
+  document.getElementById("cardSign").textContent = "Sign: " + safeText(metric.sign || "N/A") + " | Net " + fmtBn(metric.net_gex);
+  document.getElementById("cardFlip").textContent = "Flip: " + fmtNum(metric.flip_price) + " | Source: " + source;
+  document.getElementById("cardWalls").textContent =
+    "CallW " + fmtNum(metric.call_wall) + " | PutW " + fmtNum(metric.put_wall) + " | OI " + fmtInt(oi.contracts);
 }
 
 function getOIRows(symbolEntry) {
-  const rows = symbolEntry && Array.isArray(symbolEntry.oi_rows) ? symbolEntry.oi_rows.slice() : [];
+  var rows = symbolEntry && Array.isArray(symbolEntry.oi_rows) ? symbolEntry.oi_rows.slice() : [];
   if (rows.length) return rows;
-  const bucket = getBucketData(symbolEntry);
-  const fallback = bucket && Array.isArray(bucket.top_oi) ? bucket.top_oi : [];
-  return fallback.map((row) => ({
-    expiration: row.expiration,
-    strike: row.strike,
-    option_type: row.option_type,
-    open_interest: row.open_interest,
-  }));
+
+  var bucket = getBucketData(symbolEntry);
+  var fallback = bucket && Array.isArray(bucket.top_oi) ? bucket.top_oi : [];
+  var out = [];
+  for (var i = 0; i < fallback.length; i++) {
+    out.push({
+      expiration: fallback[i].expiration,
+      strike: fallback[i].strike,
+      option_type: fallback[i].option_type,
+      open_interest: fallback[i].open_interest,
+    });
+  }
+  return out;
 }
 
 function getAllExpirations(symbolEntry) {
-  const listed = symbolEntry && Array.isArray(symbolEntry.oi_expirations) ? symbolEntry.oi_expirations.slice() : [];
+  var listed = symbolEntry && Array.isArray(symbolEntry.oi_expirations) ? symbolEntry.oi_expirations.slice() : [];
   if (listed.length) {
-    return listed.map((v) => safeText(v)).filter(Boolean).sort();
+    var clean = [];
+    for (var i = 0; i < listed.length; i++) {
+      var v = safeText(listed[i]);
+      if (v) clean.push(v);
+    }
+    return uniqueSorted(clean);
   }
-  const rows = getOIRows(symbolEntry);
-  return [...new Set(rows.map((r) => safeText(r.expiration)).filter(Boolean))].sort();
+
+  var rows = getOIRows(symbolEntry);
+  var expirations = [];
+  for (var j = 0; j < rows.length; j++) {
+    var exp = safeText(rows[j].expiration);
+    if (exp) expirations.push(exp);
+  }
+  return uniqueSorted(expirations);
 }
 
 function ensureExpirationSelection(expirations) {
   if (!expirations.length) {
-    state.selectedExpirations = new Set();
+    state.selectedExpirations = [];
     state.expTouched = false;
     return;
   }
-  if (!state.expTouched && state.selectedExpirations.size === 0) {
-    state.selectedExpirations = new Set(expirations);
+
+  if (!state.expTouched && state.selectedExpirations.length === 0) {
+    state.selectedExpirations = expirations.slice();
     return;
   }
 
-  const next = new Set();
-  for (const exp of expirations) {
-    if (state.selectedExpirations.has(exp)) next.add(exp);
+  var next = [];
+  for (var i = 0; i < expirations.length; i++) {
+    if (hasSelectedExp(expirations[i])) next.push(expirations[i]);
   }
   state.selectedExpirations = next;
 }
 
 function updateExpirationSummary(all) {
-  const summary = document.getElementById("oiExpSummary");
-  const total = all.length;
-  const selected = state.selectedExpirations.size;
+  var summary = document.getElementById("oiExpSummary");
+  var total = all.length;
+  var selected = state.selectedExpirations.length;
+
   if (!total) {
     summary.textContent = "No expiration rows";
     return;
   }
   if (selected === 0) summary.textContent = "None selected";
   else if (selected === total) summary.textContent = "All expirations";
-  else summary.textContent = `${selected}/${total} selected`;
+  else summary.textContent = selected + "/" + total + " selected";
 }
 
 function renderOIExpirationFilter(symbolEntry) {
-  const holder = document.getElementById("oiExpirations");
-  const expirations = getAllExpirations(symbolEntry);
+  var holder = document.getElementById("oiExpirations");
+  var expirations = getAllExpirations(symbolEntry);
   holder.innerHTML = "";
 
   ensureExpirationSelection(expirations);
 
-  for (const exp of expirations) {
-    const id = `exp-${exp.replace(/[^0-9]/g, "")}`;
-    const checked = state.selectedExpirations.has(exp) ? "checked" : "";
-    const row = document.createElement("label");
-    row.className = "oi-exp-item";
-    row.innerHTML = `<input id="${id}" type="checkbox" value="${exp}" ${checked} /> ${fmtExp(exp)} (${exp})`;
-    holder.appendChild(row);
+  var html = "";
+  for (var i = 0; i < expirations.length; i++) {
+    var exp = expirations[i];
+    var id = "exp-" + exp.replace(/[^0-9]/g, "");
+    var checked = hasSelectedExp(exp) ? "checked" : "";
+    html += '<label class="oi-exp-item"><input id="' + id + '" type="checkbox" value="' + exp + '" ' + checked + ' /> ' + fmtExp(exp) + ' (' + exp + ")</label>";
   }
+  holder.innerHTML = html;
 
-  holder.querySelectorAll("input[type='checkbox']").forEach((el) => {
-    el.addEventListener("change", () => {
-      const exp = safeText(el.value);
+  var checkboxes = holder.querySelectorAll("input[type='checkbox']");
+  for (var c = 0; c < checkboxes.length; c++) {
+    checkboxes[c].addEventListener("change", function () {
+      var expVal = safeText(this.value);
       state.expTouched = true;
-      if (el.checked) state.selectedExpirations.add(exp);
-      else state.selectedExpirations.delete(exp);
+      if (this.checked) addSelectedExp(expVal);
+      else removeSelectedExp(expVal);
       updateExpirationSummary(expirations);
       renderOI(symbolEntry);
     });
-  });
+  }
 
-  document.getElementById("oiAllBtn").onclick = () => {
-    state.selectedExpirations = new Set(expirations);
+  document.getElementById("oiAllBtn").onclick = function () {
+    setSelectedExpList(expirations);
     state.expTouched = true;
     renderOIExpirationFilter(symbolEntry);
     renderOI(symbolEntry);
   };
 
-  document.getElementById("oiNoneBtn").onclick = () => {
-    state.selectedExpirations = new Set();
+  document.getElementById("oiNoneBtn").onclick = function () {
+    state.selectedExpirations = [];
     state.expTouched = true;
     renderOIExpirationFilter(symbolEntry);
     renderOI(symbolEntry);
@@ -340,19 +441,25 @@ function renderOIExpirationFilter(symbolEntry) {
 }
 
 function getFilteredOIRows(symbolEntry) {
-  const rows = getOIRows(symbolEntry);
+  var rows = getOIRows(symbolEntry);
   if (!rows.length) return [];
-  if (!state.selectedExpirations.size) return [];
-  return rows.filter((row) => state.selectedExpirations.has(safeText(row.expiration)));
+  if (!state.selectedExpirations.length) return [];
+
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var exp = safeText(rows[i].expiration);
+    if (hasSelectedExp(exp)) out.push(rows[i]);
+  }
+  return out;
 }
 
 function annotateLines(metric) {
-  const shapes = [];
-  const annotations = [];
+  var shapes = [];
+  var annotations = [];
 
   if (metric.call_wall != null && metric.put_wall != null) {
-    const left = Math.min(metric.call_wall, metric.put_wall);
-    const right = Math.max(metric.call_wall, metric.put_wall);
+    var left = Math.min(metric.call_wall, metric.put_wall);
+    var right = Math.max(metric.call_wall, metric.put_wall);
     shapes.push({
       type: "rect",
       x0: left,
@@ -368,506 +475,567 @@ function annotateLines(metric) {
 
   if (metric.spot != null) {
     shapes.push({ type: "line", x0: metric.spot, x1: metric.spot, y0: 0, y1: 1, yref: "paper", line: { color: CFG.spot, width: 2 } });
-    annotations.push({ x: metric.spot, y: 0.95, yref: "paper", text: `Spot ${fmtNum(metric.spot)}`, showarrow: false, font: { color: CFG.spot, size: 11 } });
+    annotations.push({ x: metric.spot, y: 0.95, yref: "paper", text: "Spot " + fmtNum(metric.spot), showarrow: false, font: { color: CFG.spot, size: 11 } });
   }
   if (metric.call_wall != null) {
     shapes.push({ type: "line", x0: metric.call_wall, x1: metric.call_wall, y0: 0, y1: 1, yref: "paper", line: { color: CFG.call, width: 1.3, dash: "dash" } });
-    annotations.push({ x: metric.call_wall, y: 0.08, yref: "paper", text: `CallW ${fmtNum(metric.call_wall)}`, showarrow: false, font: { color: CFG.call, size: 10 } });
+    annotations.push({ x: metric.call_wall, y: 0.08, yref: "paper", text: "CallW " + fmtNum(metric.call_wall), showarrow: false, font: { color: CFG.call, size: 10 } });
   }
   if (metric.put_wall != null) {
     shapes.push({ type: "line", x0: metric.put_wall, x1: metric.put_wall, y0: 0, y1: 1, yref: "paper", line: { color: CFG.put, width: 1.3, dash: "dash" } });
-    annotations.push({ x: metric.put_wall, y: 0.14, yref: "paper", text: `PutW ${fmtNum(metric.put_wall)}`, showarrow: false, font: { color: CFG.put, size: 10 } });
+    annotations.push({ x: metric.put_wall, y: 0.14, yref: "paper", text: "PutW " + fmtNum(metric.put_wall), showarrow: false, font: { color: CFG.put, size: 10 } });
   }
   if (metric.flip_price != null) {
     shapes.push({ type: "line", x0: metric.flip_price, x1: metric.flip_price, y0: 0, y1: 1, yref: "paper", line: { color: CFG.flip, width: 1.2, dash: "dot" } });
-    annotations.push({ x: metric.flip_price, y: 0.02, yref: "paper", text: `Flip ${fmtNum(metric.flip_price)}`, showarrow: false, font: { color: "#d8d8d8", size: 10 } });
+    annotations.push({ x: metric.flip_price, y: 0.02, yref: "paper", text: "Flip " + fmtNum(metric.flip_price), showarrow: false, font: { color: "#d8d8d8", size: 10 } });
   }
 
-  return { shapes, annotations };
+  return { shapes: shapes, annotations: annotations };
 }
 
 function renderLevels(bucketData) {
-  const metric = bucketData && bucketData.metric ? bucketData.metric : {};
-  const rows = bucketData && Array.isArray(bucketData.strike_profile) ? bucketData.strike_profile : [];
+  var metric = bucketData && bucketData.metric ? bucketData.metric : {};
+  var rows = bucketData && Array.isArray(bucketData.strike_profile) ? bucketData.strike_profile : [];
+
   if (!rows.length) {
-    Plotly.newPlot(
-      "levelsChart",
-      [],
-      {
-        ...baseLayout("Strike", "Gamma (Bn$ per 1% move)"),
-        annotations: [{ text: "No strike profile.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
-      },
-      baseConfig,
-    );
+    safePlot("levelsChart", [], {
+      margin: { l: 64, r: 18, t: 20, b: 46 },
+      xaxis: { title: "Strike", gridcolor: CFG.grid },
+      yaxis: { title: "Gamma (Bn$ per 1% move)", gridcolor: CFG.grid },
+      paper_bgcolor: CFG.bg,
+      plot_bgcolor: CFG.bg,
+      font: { color: CFG.text },
+      annotations: [{ text: "No strike profile.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
+    }, baseConfig);
     return;
   }
 
-  const x = rows.map((r) => toNum(r.strike));
-  const callY = rows.map((r) => (toNum(r.call_gex) || 0) / 1e9);
-  const putY = rows.map((r) => (toNum(r.put_gex) || 0) / 1e9);
-  const netY = rows.map((r) => (toNum(r.net_gex) || 0) / 1e9);
+  var x = [];
+  var callY = [];
+  var putY = [];
+  var netY = [];
+  for (var i = 0; i < rows.length; i++) {
+    x.push(toNum(rows[i].strike));
+    callY.push((toNum(rows[i].call_gex) || 0) / 1e9);
+    putY.push((toNum(rows[i].put_gex) || 0) / 1e9);
+    netY.push((toNum(rows[i].net_gex) || 0) / 1e9);
+  }
 
-  const traces = [
-    { type: "bar", x, y: callY, name: "Call GEX", marker: { color: CFG.call }, opacity: 0.62, hovertemplate: "Strike %{x}<br>Call %{y:.3f} Bn<extra></extra>" },
-    { type: "bar", x, y: putY, name: "Put GEX", marker: { color: CFG.put }, opacity: 0.62, hovertemplate: "Strike %{x}<br>Put %{y:.3f} Bn<extra></extra>" },
-    {
-      type: "scatter",
-      mode: "lines+markers",
-      x,
-      y: netY,
-      name: "Net GEX",
-      line: { color: CFG.net, width: 2 },
-      marker: { size: 4 },
-      hovertemplate: "Strike %{x}<br>Net %{y:.3f} Bn<extra></extra>",
-    },
+  var traces = [
+    { type: "bar", x: x, y: callY, name: "Call GEX", marker: { color: CFG.call }, opacity: 0.62, hovertemplate: "Strike %{x}<br>Call %{y:.3f} Bn<extra></extra>" },
+    { type: "bar", x: x, y: putY, name: "Put GEX", marker: { color: CFG.put }, opacity: 0.62, hovertemplate: "Strike %{x}<br>Put %{y:.3f} Bn<extra></extra>" },
+    { type: "scatter", mode: "lines+markers", x: x, y: netY, name: "Net GEX", line: { color: CFG.net, width: 2 }, marker: { size: 4 }, hovertemplate: "Strike %{x}<br>Net %{y:.3f} Bn<extra></extra>" },
   ];
 
-  const lines = annotateLines(metric);
-  const xRange = getDefaultPriceRange(metric.spot);
+  var lines = annotateLines(metric);
+  var layout = baseLayout("Strike", "Gamma (Bn$ per 1% move)");
+  layout.barmode = "overlay";
+  layout.shapes = lines.shapes;
+  layout.annotations = lines.annotations;
 
-  Plotly.newPlot(
-    "levelsChart",
-    traces,
-    {
-      ...baseLayout("Strike", "Gamma (Bn$ per 1% move)"),
-      barmode: "overlay",
-      shapes: lines.shapes,
-      annotations: lines.annotations,
-      xaxis: {
-        ...baseLayout("", "").xaxis,
-        title: "Strike",
-        range: xRange || undefined,
-      },
-    },
-    baseConfig,
-  );
+  var xRange = getDefaultPriceRange(metric.spot);
+  if (xRange) layout.xaxis.range = xRange;
+
+  safePlot("levelsChart", traces, layout, baseConfig);
 }
 
 function renderFlip(bucketData) {
-  const metric = bucketData && bucketData.metric ? bucketData.metric : {};
-  const curve = bucketData && Array.isArray(bucketData.gex_curve) ? bucketData.gex_curve : [];
+  var metric = bucketData && bucketData.metric ? bucketData.metric : {};
+  var curve = bucketData && Array.isArray(bucketData.gex_curve) ? bucketData.gex_curve : [];
+
   if (!curve.length) {
-    Plotly.newPlot(
-      "flipChart",
-      [],
-      {
-        ...baseLayout("Spot", "Net GEX (Bn$ per 1% move)"),
-        annotations: [{ text: "No flip curve.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
-      },
-      baseConfig,
-    );
+    safePlot("flipChart", [], {
+      margin: { l: 64, r: 18, t: 20, b: 46 },
+      xaxis: { title: "Spot", gridcolor: CFG.grid },
+      yaxis: { title: "Net GEX (Bn$ per 1% move)", gridcolor: CFG.grid },
+      paper_bgcolor: CFG.bg,
+      plot_bgcolor: CFG.bg,
+      font: { color: CFG.text },
+      annotations: [{ text: "No flip curve.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
+    }, baseConfig);
     return;
   }
 
-  const x = curve.map((r) => toNum(r.spot));
-  const y = curve.map((r) => (toNum(r.net_gex) || 0) / 1e9);
-  const yPos = y.map((v) => (v >= 0 ? v : null));
-  const yNeg = y.map((v) => (v <= 0 ? v : null));
+  var x = [];
+  var y = [];
+  var yPos = [];
+  var yNeg = [];
+  for (var i = 0; i < curve.length; i++) {
+    var xv = toNum(curve[i].spot);
+    var yv = (toNum(curve[i].net_gex) || 0) / 1e9;
+    x.push(xv);
+    y.push(yv);
+    yPos.push(yv >= 0 ? yv : null);
+    yNeg.push(yv <= 0 ? yv : null);
+  }
 
-  const traces = [
-    { type: "scatter", mode: "lines", x, y: yPos, line: { color: "#2e7d32", width: 1.2 }, name: "Positive Zone", fill: "tozeroy", fillcolor: "rgba(46,125,50,0.18)", hoverinfo: "skip" },
-    { type: "scatter", mode: "lines", x, y: yNeg, line: { color: "#b71c1c", width: 1.2 }, name: "Negative Zone", fill: "tozeroy", fillcolor: "rgba(183,28,28,0.18)", hoverinfo: "skip" },
-    { type: "scatter", mode: "lines", x, y, line: { color: "#7E57C2", width: 2.2 }, name: "Net GEX Curve", hovertemplate: "Spot %{x:.2f}<br>Net %{y:.3f} Bn<extra></extra>" },
+  var traces = [
+    { type: "scatter", mode: "lines", x: x, y: yPos, line: { color: "#2e7d32", width: 1.2 }, name: "Positive Zone", fill: "tozeroy", fillcolor: "rgba(46,125,50,0.18)", hoverinfo: "skip" },
+    { type: "scatter", mode: "lines", x: x, y: yNeg, line: { color: "#b71c1c", width: 1.2 }, name: "Negative Zone", fill: "tozeroy", fillcolor: "rgba(183,28,28,0.18)", hoverinfo: "skip" },
+    { type: "scatter", mode: "lines", x: x, y: y, line: { color: "#7E57C2", width: 2.2 }, name: "Net GEX Curve", hovertemplate: "Spot %{x:.2f}<br>Net %{y:.3f} Bn<extra></extra>" },
   ];
 
-  const shapes = [{ type: "line", x0: Math.min(...x), x1: Math.max(...x), y0: 0, y1: 0, line: { color: "#90a4ae", width: 1 } }];
+  var minX = Math.min.apply(null, x);
+  var maxX = Math.max.apply(null, x);
+
+  var shapes = [{ type: "line", x0: minX, x1: maxX, y0: 0, y1: 0, line: { color: "#90a4ae", width: 1 } }];
   if (metric.spot != null) shapes.push({ type: "line", x0: metric.spot, x1: metric.spot, y0: 0, y1: 1, yref: "paper", line: { color: CFG.spot, width: 1.6 } });
   if (metric.flip_price != null) shapes.push({ type: "line", x0: metric.flip_price, x1: metric.flip_price, y0: 0, y1: 1, yref: "paper", line: { color: CFG.flip, width: 1.2, dash: "dot" } });
 
-  const xRange = getDefaultPriceRange(metric.spot);
+  var layout = baseLayout("Hypothetical Spot Price", "Net GEX (Bn$ per 1% move)");
+  layout.shapes = shapes;
+  var xRange = getDefaultPriceRange(metric.spot);
+  if (xRange) layout.xaxis.range = xRange;
 
-  Plotly.newPlot(
-    "flipChart",
-    traces,
-    {
-      ...baseLayout("Hypothetical Spot Price", "Net GEX (Bn$ per 1% move)"),
-      shapes,
-      xaxis: {
-        ...baseLayout("", "").xaxis,
-        title: "Hypothetical Spot Price",
-        range: xRange || undefined,
-      },
-    },
-    baseConfig,
-  );
+  safePlot("flipChart", traces, layout, baseConfig);
 }
 
 function renderTrend(bucketData) {
-  const history = bucketData && Array.isArray(bucketData.history) ? bucketData.history.slice() : [];
+  var history = bucketData && Array.isArray(bucketData.history) ? bucketData.history.slice() : [];
+
   if (!history.length) {
-    Plotly.newPlot(
-      "trendChart",
-      [],
-      {
-        ...baseLayout("Run Time", "Net GEX (Bn$ per 1% move)"),
-        annotations: [{ text: "No trend history.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
-      },
-      baseConfig,
-    );
+    safePlot("trendChart", [], {
+      margin: { l: 64, r: 18, t: 20, b: 46 },
+      xaxis: { title: "Run Time", gridcolor: CFG.grid, type: "date" },
+      yaxis: { title: "Net GEX (Bn$ per 1% move)", gridcolor: CFG.grid },
+      paper_bgcolor: CFG.bg,
+      plot_bgcolor: CFG.bg,
+      font: { color: CFG.text },
+      annotations: [{ text: "No trend history.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
+    }, baseConfig);
     return;
   }
 
-  history.sort((a, b) => {
-    const taObj = parseTime(a.finished_at);
-    const tbObj = parseTime(b.finished_at);
-    const ta = taObj ? taObj.getTime() : 0;
-    const tb = tbObj ? tbObj.getTime() : 0;
+  history.sort(function (a, b) {
+    var taObj = parseTime(a.finished_at);
+    var tbObj = parseTime(b.finished_at);
+    var ta = taObj ? taObj.getTime() : 0;
+    var tb = tbObj ? tbObj.getTime() : 0;
     return ta - tb;
   });
 
-  const x = history.map((r) => parseTime(r.finished_at));
-  const y = history.map((r) => (toNum(r.net_gex) || 0) / 1e9);
+  var x = [];
+  var y = [];
+  var cd = [];
+  for (var i = 0; i < history.length; i++) {
+    x.push(parseTime(history[i].finished_at));
+    y.push((toNum(history[i].net_gex) || 0) / 1e9);
+    cd.push([toNum(history[i].spot), toNum(history[i].flip_price), safeText(history[i].sign)]);
+  }
 
-  Plotly.newPlot(
-    "trendChart",
-    [
-      {
-        type: "scatter",
-        mode: "lines+markers",
-        x,
-        y,
-        line: { color: "#1B9E77", width: 2 },
-        marker: { size: 6 },
-        name: "Net GEX",
-        customdata: history.map((r) => [toNum(r.spot), toNum(r.flip_price), safeText(r.sign)]),
-        hovertemplate:
-          "Time %{x|%Y-%m-%d %H:%M}<br>Net %{y:.3f} Bn<br>Spot %{customdata[0]:.2f}<br>Flip %{customdata[1]:.2f}<br>Sign %{customdata[2]}<extra></extra>",
-      },
-    ],
+  safePlot("trendChart", [
     {
-      ...baseLayout("Run Time", "Net GEX (Bn$ per 1% move)"),
-      xaxis: { title: "Run Time", type: "date", gridcolor: CFG.grid },
+      type: "scatter",
+      mode: "lines+markers",
+      x: x,
+      y: y,
+      line: { color: "#1B9E77", width: 2 },
+      marker: { size: 6 },
+      name: "Net GEX",
+      customdata: cd,
+      hovertemplate: "Time %{x|%Y-%m-%d %H:%M}<br>Net %{y:.3f} Bn<br>Spot %{customdata[0]:.2f}<br>Flip %{customdata[1]:.2f}<br>Sign %{customdata[2]}<extra></extra>",
     },
-    baseConfig,
-  );
+  ],
+  {
+    margin: { l: 64, r: 18, t: 20, b: 46 },
+    xaxis: { title: "Run Time", gridcolor: CFG.grid, type: "date" },
+    yaxis: { title: "Net GEX (Bn$ per 1% move)", gridcolor: CFG.grid, zeroline: true, zerolinecolor: "#7b8798", zerolinewidth: 1 },
+    dragmode: "pan",
+    paper_bgcolor: CFG.bg,
+    plot_bgcolor: CFG.bg,
+    font: { color: CFG.text },
+    legend: { orientation: "h" },
+  }, baseConfig);
 }
 
 function renderBucketCompare(symbolEntry) {
-  const buckets = ["front", "core", "medium"];
-  const labels = { front: "Front (0-7)", core: "Core (8-90)", medium: "Medium (46-90)" };
-  const colors = { front: CFG.front, core: CFG.core, medium: CFG.medium };
-  const traces = [];
+  var buckets = ["front", "core", "medium"];
+  var labels = { front: "Front (0-7)", core: "Core (8-90)", medium: "Medium (46-90)" };
+  var colors = { front: CFG.front, core: CFG.core, medium: CFG.medium };
+  var traces = [];
 
-  for (const bucket of buckets) {
-    const data = getBucketData(symbolEntry, bucket);
-    const rows = data && Array.isArray(data.strike_profile) ? data.strike_profile : [];
+  for (var i = 0; i < buckets.length; i++) {
+    var bucket = buckets[i];
+    var data = getBucketData(symbolEntry, bucket);
+    var rows = data && Array.isArray(data.strike_profile) ? data.strike_profile : [];
     if (!rows.length) continue;
+
+    var x = [];
+    var y = [];
+    for (var j = 0; j < rows.length; j++) {
+      x.push(toNum(rows[j].strike));
+      y.push((toNum(rows[j].net_gex) || 0) / 1e9);
+    }
+
     traces.push({
       type: "scatter",
       mode: "lines+markers",
-      x: rows.map((r) => toNum(r.strike)),
-      y: rows.map((r) => (toNum(r.net_gex) || 0) / 1e9),
+      x: x,
+      y: y,
       name: labels[bucket],
       line: { color: colors[bucket], width: 2 },
       marker: { size: 3 },
-      hovertemplate: `${labels[bucket]}<br>Strike %{x}<br>Net %{y:.3f} Bn<extra></extra>`,
+      hovertemplate: labels[bucket] + "<br>Strike %{x}<br>Net %{y:.3f} Bn<extra></extra>",
     });
   }
 
   if (!traces.length) {
-    Plotly.newPlot(
-      "bucketChart",
-      [],
-      {
-        ...baseLayout("Strike", "Net GEX (Bn$ per 1% move)"),
-        annotations: [{ text: "No bucket comparison data.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
-      },
-      baseConfig,
-    );
+    safePlot("bucketChart", [], {
+      margin: { l: 64, r: 18, t: 20, b: 46 },
+      xaxis: { title: "Strike", gridcolor: CFG.grid },
+      yaxis: { title: "Net GEX (Bn$ per 1% move)", gridcolor: CFG.grid },
+      paper_bgcolor: CFG.bg,
+      plot_bgcolor: CFG.bg,
+      font: { color: CFG.text },
+      annotations: [{ text: "No bucket comparison data.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
+    }, baseConfig);
     return;
   }
 
-  const metric = getMetric(symbolEntry, state.bucket);
-  const xRange = getDefaultPriceRange(metric.spot);
-  const shapes = [];
+  var metric = getMetric(symbolEntry, state.bucket);
+  var layout = baseLayout("Strike", "Net GEX (Bn$ per 1% move)");
+  layout.shapes = [];
   if (metric.spot != null) {
-    shapes.push({
-      type: "line",
-      x0: metric.spot,
-      x1: metric.spot,
-      y0: 0,
-      y1: 1,
-      yref: "paper",
-      line: { color: CFG.spot, width: 1.8 },
-    });
+    layout.shapes.push({ type: "line", x0: metric.spot, x1: metric.spot, y0: 0, y1: 1, yref: "paper", line: { color: CFG.spot, width: 1.8 } });
   }
+  var xRange = getDefaultPriceRange(metric.spot);
+  if (xRange) layout.xaxis.range = xRange;
 
-  Plotly.newPlot(
-    "bucketChart",
-    traces,
-    {
-      ...baseLayout("Strike", "Net GEX (Bn$ per 1% move)"),
-      shapes,
-      xaxis: {
-        ...baseLayout("", "").xaxis,
-        title: "Strike",
-        range: xRange || undefined,
-      },
-    },
-    baseConfig,
-  );
+  safePlot("bucketChart", traces, layout, baseConfig);
 }
 
 function renderOI(symbolEntry) {
-  const rows = getFilteredOIRows(symbolEntry);
-  const top = rows
-    .slice()
-    .sort((a, b) => (toNum(b.open_interest) || 0) - (toNum(a.open_interest) || 0))
-    .slice(0, 24);
+  var rows = getFilteredOIRows(symbolEntry);
+  rows.sort(function (a, b) {
+    return (toNum(b.open_interest) || 0) - (toNum(a.open_interest) || 0);
+  });
+  var top = rows.slice(0, 24);
 
   if (!top.length) {
-    Plotly.newPlot(
-      "oiChart",
-      [],
-      {
-        ...baseLayout("Open Interest", "Contract"),
-        annotations: [{ text: "No OI rows for selected expiration(s).", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
-      },
-      baseConfig,
-    );
-    document.getElementById("oiTableWrap").innerHTML = "<div class=\"hint\">No OI rows for selected expiration(s).</div>";
+    safePlot("oiChart", [], {
+      margin: { l: 64, r: 18, t: 20, b: 46 },
+      xaxis: { title: "Open Interest", gridcolor: CFG.grid },
+      yaxis: { title: "Contract", gridcolor: CFG.grid },
+      paper_bgcolor: CFG.bg,
+      plot_bgcolor: CFG.bg,
+      font: { color: CFG.text },
+      annotations: [{ text: "No OI rows for selected expiration(s).", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
+    }, baseConfig);
+    document.getElementById("oiTableWrap").innerHTML = '<div class="hint">No OI rows for selected expiration(s).</div>';
     return;
   }
 
-  const makeLabel = (r) => {
-    const cp = safeText(r.option_type).toLowerCase().startsWith("c") ? "C" : "P";
-    return `${symbolEntry.symbol} ${fmtExp(r.expiration)} ${fmtNum(r.strike)}${cp}`;
-  };
+  function makeLabel(r) {
+    var cp = safeText(r.option_type).toLowerCase().indexOf("c") === 0 ? "C" : "P";
+    return safeText(symbolEntry.symbol) + " " + fmtExp(r.expiration) + " " + fmtNum(r.strike) + cp;
+  }
 
-  const calls = top.filter((r) => safeText(r.option_type).toLowerCase().startsWith("c"));
-  const puts = top.filter((r) => safeText(r.option_type).toLowerCase().startsWith("p"));
+  var calls = [];
+  var puts = [];
+  var maxOi = 1;
+  for (var i = 0; i < top.length; i++) {
+    var oi = toNum(top[i].open_interest) || 0;
+    if (oi > maxOi) maxOi = oi;
+    if (safeText(top[i].option_type).toLowerCase().indexOf("c") === 0) calls.push(top[i]);
+    else puts.push(top[i]);
+  }
 
-  const maxOi = Math.max(1, ...top.map((r) => toNum(r.open_interest) || 0));
+  function mapX(arr) {
+    var out = [];
+    for (var i = 0; i < arr.length; i++) out.push(toNum(arr[i].open_interest) || 0);
+    return out;
+  }
+  function mapY(arr) {
+    var out = [];
+    for (var i = 0; i < arr.length; i++) out.push(makeLabel(arr[i]));
+    return out;
+  }
+  function mapText(arr) {
+    var out = [];
+    for (var i = 0; i < arr.length; i++) out.push(fmtInt(arr[i].open_interest));
+    return out;
+  }
 
-  Plotly.newPlot(
-    "oiChart",
-    [
-      {
-        type: "bar",
-        orientation: "h",
-        x: calls.map((r) => toNum(r.open_interest) || 0),
-        y: calls.map(makeLabel),
-        marker: { color: CFG.call },
-        name: "Calls",
-        text: calls.map((r) => fmtInt(r.open_interest)),
-        textposition: "outside",
-        cliponaxis: false,
-        hovertemplate: "%{y}<br>OI %{x:,}<extra></extra>",
-      },
-      {
-        type: "bar",
-        orientation: "h",
-        x: puts.map((r) => toNum(r.open_interest) || 0),
-        y: puts.map(makeLabel),
-        marker: { color: "#E58A8A" },
-        name: "Puts",
-        text: puts.map((r) => fmtInt(r.open_interest)),
-        textposition: "outside",
-        cliponaxis: false,
-        hovertemplate: "%{y}<br>OI %{x:,}<extra></extra>",
-      },
-    ],
+  safePlot("oiChart", [
     {
-      ...baseLayout("Open Interest", ""),
-      barmode: "overlay",
-      margin: { l: 240, r: 24, t: 10, b: 36 },
-      xaxis: { title: "Open Interest", range: [0, maxOi * 1.2], gridcolor: CFG.grid },
-      yaxis: { automargin: true },
+      type: "bar",
+      orientation: "h",
+      x: mapX(calls),
+      y: mapY(calls),
+      marker: { color: CFG.call },
+      name: "Calls",
+      text: mapText(calls),
+      textposition: "outside",
+      cliponaxis: false,
+      hovertemplate: "%{y}<br>OI %{x:,}<extra></extra>",
     },
-    baseConfig,
-  );
+    {
+      type: "bar",
+      orientation: "h",
+      x: mapX(puts),
+      y: mapY(puts),
+      marker: { color: "#E58A8A" },
+      name: "Puts",
+      text: mapText(puts),
+      textposition: "outside",
+      cliponaxis: false,
+      hovertemplate: "%{y}<br>OI %{x:,}<extra></extra>",
+    },
+  ],
+  {
+    margin: { l: 240, r: 24, t: 10, b: 36 },
+    xaxis: { title: "Open Interest", range: [0, maxOi * 1.2], gridcolor: CFG.grid },
+    yaxis: { automargin: true },
+    barmode: "overlay",
+    dragmode: "pan",
+    paper_bgcolor: CFG.bg,
+    plot_bgcolor: CFG.bg,
+    font: { color: CFG.text },
+    legend: { orientation: "h" },
+  }, baseConfig);
 
-  const body = top
-    .map((r) => {
-      const cp = safeText(r.option_type).toLowerCase().startsWith("c") ? "C" : "P";
-      return `<tr><td>${fmtExp(r.expiration)}</td><td>${fmtNum(r.strike)}</td><td>${cp}</td><td>${fmtInt(r.open_interest)}</td></tr>`;
-    })
-    .join("");
+  var body = "";
+  for (var j = 0; j < top.length; j++) {
+    var cp = safeText(top[j].option_type).toLowerCase().indexOf("c") === 0 ? "C" : "P";
+    body += "<tr><td>" + fmtExp(top[j].expiration) + "</td><td>" + fmtNum(top[j].strike) + "</td><td>" + cp + "</td><td>" + fmtInt(top[j].open_interest) + "</td></tr>";
+  }
 
-  document.getElementById("oiTableWrap").innerHTML = `
-    <table>
-      <thead><tr><th>Expiration</th><th>Strike</th><th>Type</th><th>Open Interest</th></tr></thead>
-      <tbody>${body}</tbody>
-    </table>
-  `;
+  document.getElementById("oiTableWrap").innerHTML =
+    "<table><thead><tr><th>Expiration</th><th>Strike</th><th>Type</th><th>Open Interest</th></tr></thead><tbody>" + body + "</tbody></table>";
 }
 
 function renderHeatmap(bucketData) {
-  const rows = bucketData && Array.isArray(bucketData.heatmap_history) ? bucketData.heatmap_history : [];
+  var rows = bucketData && Array.isArray(bucketData.heatmap_history) ? bucketData.heatmap_history : [];
+
   if (!rows.length) {
-    Plotly.newPlot(
-      "heatmapChart",
-      [],
-      {
-        ...baseLayout("Run Time", "Strike"),
-        annotations: [{ text: "No gamma heatmap history.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
-      },
-      baseConfig,
-    );
+    safePlot("heatmapChart", [], {
+      margin: { l: 64, r: 18, t: 20, b: 46 },
+      xaxis: { title: "Run Time", gridcolor: CFG.grid, type: "date" },
+      yaxis: { title: "Strike", gridcolor: CFG.grid },
+      paper_bgcolor: CFG.bg,
+      plot_bgcolor: CFG.bg,
+      font: { color: CFG.text },
+      annotations: [{ text: "No gamma heatmap history.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
+    }, baseConfig);
     return;
   }
 
-  const items = rows
-    .map((r) => ({
-      t: parseTime(r.finished_at),
-      strike: toNum(r.strike),
-      net: (toNum(r.net_gex) || 0) / 1e9,
-      spot: toNum(r.spot),
-    }))
-    .filter((r) => r.t && r.strike !== null);
+  var items = [];
+  for (var i = 0; i < rows.length; i++) {
+    var t = parseTime(rows[i].finished_at);
+    var strike = toNum(rows[i].strike);
+    if (!t || strike === null) continue;
+    items.push({
+      t: t,
+      iso: t.toISOString(),
+      strike: strike,
+      net: (toNum(rows[i].net_gex) || 0) / 1e9,
+      spot: toNum(rows[i].spot),
+    });
+  }
 
   if (!items.length) {
-    Plotly.newPlot(
-      "heatmapChart",
-      [],
-      {
-        ...baseLayout("Run Time", "Strike"),
-        annotations: [{ text: "No gamma heatmap history.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
-      },
-      baseConfig,
-    );
+    safePlot("heatmapChart", [], {
+      margin: { l: 64, r: 18, t: 20, b: 46 },
+      xaxis: { title: "Run Time", gridcolor: CFG.grid, type: "date" },
+      yaxis: { title: "Strike", gridcolor: CFG.grid },
+      paper_bgcolor: CFG.bg,
+      plot_bgcolor: CFG.bg,
+      font: { color: CFG.text },
+      annotations: [{ text: "No gamma heatmap history.", x: 0.5, y: 0.5, xref: "paper", yref: "paper", showarrow: false }],
+    }, baseConfig);
     return;
   }
 
-  items.sort((a, b) => a.t.getTime() - b.t.getTime() || a.strike - b.strike);
-  const times = [...new Map(items.map((r) => [r.t.toISOString(), r.t])).values()];
-  const strikes = [...new Set(items.map((r) => r.strike))].sort((a, b) => a - b);
+  items.sort(function (a, b) {
+    var dt = a.t.getTime() - b.t.getTime();
+    if (dt !== 0) return dt;
+    return a.strike - b.strike;
+  });
 
-  const xIndex = new Map(times.map((t, i) => [t.toISOString(), i]));
-  const yIndex = new Map(strikes.map((s, i) => [String(s), i]));
-  const z = strikes.map(() => times.map(() => null));
+  var times = [];
+  var timesSeen = {};
+  var strikes = [];
+  var strikesSeen = {};
 
-  for (const it of items) {
-    const xi = xIndex.get(it.t.toISOString());
-    const yi = yIndex.get(String(it.strike));
-    if (xi === undefined || yi === undefined) continue;
-    z[yi][xi] = it.net;
+  for (var j = 0; j < items.length; j++) {
+    if (!timesSeen[items[j].iso]) {
+      timesSeen[items[j].iso] = true;
+      times.push(items[j].t);
+    }
+    var sKey = String(items[j].strike);
+    if (!strikesSeen[sKey]) {
+      strikesSeen[sKey] = true;
+      strikes.push(items[j].strike);
+    }
+  }
+  strikes.sort(function (a, b) { return a - b; });
+
+  var xIndex = {};
+  for (var x = 0; x < times.length; x++) xIndex[times[x].toISOString()] = x;
+  var yIndex = {};
+  for (var y = 0; y < strikes.length; y++) yIndex[String(strikes[y])] = y;
+
+  var z = [];
+  for (var yi = 0; yi < strikes.length; yi++) {
+    var row = [];
+    for (var xi = 0; xi < times.length; xi++) row.push(null);
+    z.push(row);
   }
 
-  const absVals = z.flat().filter((v) => typeof v === "number").map((v) => Math.abs(v));
-  let maxAbs = 1;
+  for (var k = 0; k < items.length; k++) {
+    var iX = xIndex[items[k].iso];
+    var iY = yIndex[String(items[k].strike)];
+    if (iX === undefined || iY === undefined) continue;
+    z[iY][iX] = items[k].net;
+  }
+
+  var absVals = [];
+  for (var a = 0; a < z.length; a++) {
+    for (var b = 0; b < z[a].length; b++) {
+      if (typeof z[a][b] === "number") absVals.push(Math.abs(z[a][b]));
+    }
+  }
+  var maxAbs = 1;
   if (absVals.length) {
-    absVals.sort((a, b) => a - b);
-    const idx = Math.floor(absVals.length * 0.98);
-    maxAbs = absVals[Math.max(0, Math.min(idx, absVals.length - 1))] || 1;
+    absVals.sort(function (u, v) { return u - v; });
+    var idx = Math.floor(absVals.length * 0.98);
+    if (idx < 0) idx = 0;
+    if (idx >= absVals.length) idx = absVals.length - 1;
+    maxAbs = absVals[idx] || 1;
   }
 
-  const spotByTime = new Map();
-  for (const it of items) {
-    if (it.spot !== null) spotByTime.set(it.t.toISOString(), it.spot);
+  var spotByIso = {};
+  for (var m = 0; m < items.length; m++) {
+    if (items[m].spot !== null) spotByIso[items[m].iso] = items[m].spot;
+  }
+  var spotLine = [];
+  for (var n = 0; n < times.length; n++) {
+    var key = times[n].toISOString();
+    spotLine.push(Object.prototype.hasOwnProperty.call(spotByIso, key) ? spotByIso[key] : null);
   }
 
-  Plotly.newPlot(
-    "heatmapChart",
-    [
-      {
-        type: "heatmap",
-        x: times,
-        y: strikes,
-        z,
-        zmid: 0,
-        zmin: -maxAbs,
-        zmax: maxAbs,
-        colorscale: [
-          [0.0, "#d73027"],
-          [0.5, "#f7f7f7"],
-          [1.0, "#4575b4"],
-        ],
-        colorbar: { title: "Net GEX (Bn)" },
-        hovertemplate: "Time %{x|%Y-%m-%d %H:%M}<br>Strike %{y:.2f}<br>Net %{z:.3f} Bn<extra></extra>",
-      },
-      {
-        type: "scatter",
-        mode: "lines",
-        x: times,
-        y: times.map((t) => {
-          const key = t.toISOString();
-          return spotByTime.has(key) ? spotByTime.get(key) : null;
-        }),
-        line: { color: "#111111", width: 2 },
-        name: "Spot Path",
-        hovertemplate: "Time %{x|%Y-%m-%d %H:%M}<br>Spot %{y:.2f}<extra></extra>",
-      },
-    ],
+  safePlot("heatmapChart", [
     {
-      ...baseLayout("Run Time", "Strike"),
-      xaxis: { title: "Run Time", type: "date", gridcolor: CFG.grid },
-      yaxis: { title: "Strike", gridcolor: CFG.grid },
+      type: "heatmap",
+      x: times,
+      y: strikes,
+      z: z,
+      zmid: 0,
+      zmin: -maxAbs,
+      zmax: maxAbs,
+      colorscale: [[0.0, "#d73027"], [0.5, "#f7f7f7"], [1.0, "#4575b4"]],
+      colorbar: { title: "Net GEX (Bn)" },
+      hovertemplate: "Time %{x|%Y-%m-%d %H:%M}<br>Strike %{y:.2f}<br>Net %{z:.3f} Bn<extra></extra>",
     },
-    baseConfig,
-  );
+    {
+      type: "scatter",
+      mode: "lines",
+      x: times,
+      y: spotLine,
+      line: { color: "#111111", width: 2 },
+      name: "Spot Path",
+      hovertemplate: "Time %{x|%Y-%m-%d %H:%M}<br>Spot %{y:.2f}<extra></extra>",
+    },
+  ],
+  {
+    margin: { l: 64, r: 18, t: 20, b: 46 },
+    xaxis: { title: "Run Time", gridcolor: CFG.grid, type: "date" },
+    yaxis: { title: "Strike", gridcolor: CFG.grid },
+    dragmode: "pan",
+    paper_bgcolor: CFG.bg,
+    plot_bgcolor: CFG.bg,
+    font: { color: CFG.text },
+    legend: { orientation: "h" },
+  }, baseConfig);
 }
 
 function setHint() {
-  const hint = document.getElementById("chartHint");
+  var hint = document.getElementById("chartHint");
   hint.textContent = TAB_HINTS[state.activeTab] || "";
 }
 
 function activateTab(tabName) {
   state.activeTab = tabName;
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.tab === tabName);
-  });
-  document.querySelectorAll(".tab-panel").forEach((panel) => {
-    panel.classList.toggle("active", panel.id === `panel-${tabName}`);
-  });
-  const quick = document.getElementById("tabSelect");
+
+  var btns = document.querySelectorAll(".tab-btn");
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle("active", btns[i].getAttribute("data-tab") === tabName);
+  }
+
+  var panels = document.querySelectorAll(".tab-panel");
+  for (var j = 0; j < panels.length; j++) {
+    panels[j].classList.toggle("active", panels[j].id === "panel-" + tabName);
+  }
+
+  var quick = document.getElementById("tabSelect");
   if (quick.value !== tabName) quick.value = tabName;
   setHint();
 }
 
 function renderAll() {
-  const symbolEntry = getSymbolEntry();
+  var symbolEntry = getSymbolEntry();
   if (!symbolEntry) return;
 
-  const bucketData = getBucketData(symbolEntry);
+  var bucketData = getBucketData(symbolEntry);
   renderSnapshotTable();
   renderCards(symbolEntry, bucketData);
   renderOIExpirationFilter(symbolEntry);
-  renderLevels(bucketData);
-  renderFlip(bucketData);
-  renderTrend(bucketData);
-  renderBucketCompare(symbolEntry);
-  renderOI(symbolEntry);
-  renderHeatmap(bucketData);
+
+  try { renderLevels(bucketData); } catch (e1) {}
+  try { renderFlip(bucketData); } catch (e2) {}
+  try { renderTrend(bucketData); } catch (e3) {}
+  try { renderBucketCompare(symbolEntry); } catch (e4) {}
+  try { renderOI(symbolEntry); } catch (e5) {}
+  try { renderHeatmap(bucketData); } catch (e6) {}
+
   setHint();
 }
 
 function bindEvents() {
-  document.getElementById("symbolSelect").addEventListener("change", (ev) => {
+  document.getElementById("symbolSelect").addEventListener("change", function (ev) {
     state.symbol = safeText(ev.target.value).toUpperCase();
-    state.selectedExpirations = new Set();
+    state.selectedExpirations = [];
     state.expTouched = false;
     renderAll();
   });
 
-  document.getElementById("bucketSelect").addEventListener("change", (ev) => {
+  document.getElementById("bucketSelect").addEventListener("change", function (ev) {
     state.bucket = safeText(ev.target.value) || "core";
     renderAll();
   });
 
-  document.getElementById("tabSelect").addEventListener("change", (ev) => {
+  document.getElementById("tabSelect").addEventListener("change", function (ev) {
     activateTab(safeText(ev.target.value) || "levels");
   });
 
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => activateTab(btn.dataset.tab));
-  });
+  var btns = document.querySelectorAll(".tab-btn");
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].addEventListener("click", function () {
+      activateTab(this.getAttribute("data-tab"));
+    });
+  }
 }
 
-async function loadSnapshot() {
-  const resp = await fetch(`./latest.json?v=${Date.now()}`);
-  if (!resp.ok) throw new Error(`Failed to load latest.json (${resp.status})`);
-  state.payload = await resp.json();
-
-  renderMeta();
-  renderSymbolSelect();
-  bindEvents();
-  activateTab("levels");
-  renderAll();
+function loadSnapshot() {
+  var url = "./latest.json?v=" + Date.now();
+  fetch(url)
+    .then(function (resp) {
+      if (!resp.ok) throw new Error("Failed to load latest.json (" + resp.status + ")");
+      return resp.json();
+    })
+    .then(function (data) {
+      state.payload = data;
+      renderMeta();
+      renderSymbolSelect();
+      bindEvents();
+      activateTab("levels");
+      renderAll();
+    })
+    .catch(function (err) {
+      var line = document.getElementById("metaLine");
+      line.textContent = "Load failed: " + err.message;
+    });
 }
 
-loadSnapshot().catch((err) => {
-  const line = document.getElementById("metaLine");
-  line.textContent = `Load failed: ${err.message}`;
-});
+loadSnapshot();
