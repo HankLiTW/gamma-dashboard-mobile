@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gamma Mobile Viewer</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <h1>Gamma Mobile Viewer</h1>
+        <div id="metaLine" class="meta">Loading...</div>
+      </header>
+
+      <section class="controls">
+        <label for="symbolSelect">Symbol</label>
+        <select id="symbolSelect"></select>
+
+        <label for="bucketSelect">Bucket</label>
+        <select id="bucketSelect">
+          <option value="front">Front (0-7DTE)</option>
+          <option value="core" selected>Core (8-90DTE)</option>
+          <option value="medium">Medium (46-90DTE)</option>
+        </select>
+      </section>
+
+      <section class="cards">
+        <div class="card" id="cardSpot">Spot: -</div>
+        <div class="card" id="cardSign">Sign: -</div>
+        <div class="card" id="cardFlip">Flip: -</div>
+        <div class="card" id="cardWalls">Walls: -</div>
+      </section>
+
+      <section class="panel">
+        <h2>Levels Map</h2>
+        <div id="levelsChart" class="chart"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Flip Curve</h2>
+        <div id="flipChart" class="chart"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Top OI</h2>
+        <div id="oiTableWrap"></div>
+      </section>
+    </main>
+    <script src="./viewer.js"></script>
+  </body>
+</html>
+
