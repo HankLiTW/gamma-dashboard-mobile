@@ -34,7 +34,11 @@ var state = {
   activeTab: "levels",
   selectedExpirations: [],
   expTouched: false,
+  symbolOrder: [],
+  dragSymbol: null,
 };
+
+var SYMBOL_ORDER_STORAGE_KEY = "gamma_dashboard_symbol_order_v1";
 
 function toNum(val) {
   var n = Number(val);
@@ -163,6 +167,58 @@ function setSelectedExpList(list) {
   state.selectedExpirations = list.slice();
 }
 
+function arrContains(arr, value) {
+  return arr.indexOf(value) >= 0;
+}
+
+function loadStoredSymbolOrder() {
+  try {
+    if (typeof localStorage === "undefined") return [];
+    var raw = localStorage.getItem(SYMBOL_ORDER_STORAGE_KEY);
+    if (!raw) return [];
+    var parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    var out = [];
+    for (var i = 0; i < parsed.length; i++) {
+      var sym = safeText(parsed[i]).toUpperCase();
+      if (sym && !arrContains(out, sym)) out.push(sym);
+    }
+    return out;
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveStoredSymbolOrder() {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(SYMBOL_ORDER_STORAGE_KEY, JSON.stringify(state.symbolOrder || []));
+  } catch (e) {
+  }
+}
+
+function syncSymbolOrder(availableSymbols) {
+  var available = availableSymbols.slice();
+  var order = [];
+  if (state.symbolOrder && state.symbolOrder.length) {
+    order = state.symbolOrder.slice();
+  } else {
+    order = loadStoredSymbolOrder();
+  }
+
+  var next = [];
+  for (var i = 0; i < order.length; i++) {
+    if (arrContains(available, order[i]) && !arrContains(next, order[i])) next.push(order[i]);
+  }
+  for (var j = 0; j < available.length; j++) {
+    if (!arrContains(next, available[j])) next.push(available[j]);
+  }
+
+  state.symbolOrder = next;
+  saveStoredSymbolOrder();
+  return next.slice();
+}
+
 function getSymbols() {
   var root = state.payload || {};
   var symbolsRaw = Array.isArray(root.symbols) ? root.symbols : [];
@@ -172,7 +228,7 @@ function getSymbols() {
     if (sym) symbols.push(sym);
   }
   symbols.sort();
-  return symbols;
+  return syncSymbolOrder(symbols);
 }
 
 function getSymbolEntry(sym) {
@@ -280,7 +336,7 @@ function renderSnapshotTable() {
     var activeCls = sym === state.symbol ? "active" : "";
 
     html +=
-      '<tr data-symbol="' + sym + '" class="' + activeCls + '">' +
+      '<tr data-symbol="' + sym + '" class="' + activeCls + '" draggable="true">' +
       '<td class="symbol-cell">' + sym + "</td>" +
       '<td><span class="badge ' + badgeCls + '" title="' + (safeText(source) || "unknown") + '">' + badgeText + "</span></td>" +
       "<td>" + fmtNum(metric.spot) + "</td>" +
@@ -295,6 +351,36 @@ function renderSnapshotTable() {
   body.innerHTML = html;
 
   var rows = body.querySelectorAll("tr[data-symbol]");
+  function clearDragClasses() {
+    var allRows = body.querySelectorAll("tr[data-symbol]");
+    for (var idx = 0; idx < allRows.length; idx++) {
+      allRows[idx].classList.remove("dragging");
+      allRows[idx].classList.remove("drop-before");
+      allRows[idx].classList.remove("drop-after");
+    }
+  }
+
+  function reorderSymbols(dragSymbol, targetSymbol, insertAfter) {
+    if (!dragSymbol || !targetSymbol || dragSymbol === targetSymbol) return;
+    var order = getSymbols().slice();
+    var fromIndex = order.indexOf(dragSymbol);
+    var targetIndex = order.indexOf(targetSymbol);
+    if (fromIndex < 0 || targetIndex < 0) return;
+
+    order.splice(fromIndex, 1);
+    if (fromIndex < targetIndex) targetIndex -= 1;
+    if (insertAfter) targetIndex += 1;
+    if (targetIndex < 0) targetIndex = 0;
+    if (targetIndex > order.length) targetIndex = order.length;
+    order.splice(targetIndex, 0, dragSymbol);
+
+    state.symbolOrder = order.slice();
+    saveStoredSymbolOrder();
+    renderSymbolSelect();
+    document.getElementById("symbolSelect").value = state.symbol || "";
+    renderSnapshotTable();
+  }
+
   for (var r = 0; r < rows.length; r++) {
     rows[r].addEventListener("click", function () {
       var symbol = safeText(this.getAttribute("data-symbol")).toUpperCase();
@@ -304,12 +390,58 @@ function renderSnapshotTable() {
       document.getElementById("symbolSelect").value = symbol;
       renderAll();
     });
+
+    rows[r].addEventListener("dragstart", function (ev) {
+      var symbol = safeText(this.getAttribute("data-symbol")).toUpperCase();
+      state.dragSymbol = symbol;
+      this.classList.add("dragging");
+      if (ev.dataTransfer) {
+        ev.dataTransfer.effectAllowed = "move";
+        try {
+          ev.dataTransfer.setData("text/plain", symbol);
+        } catch (e) {
+        }
+      }
+    });
+
+    rows[r].addEventListener("dragover", function (ev) {
+      if (!state.dragSymbol) return;
+      var targetSymbol = safeText(this.getAttribute("data-symbol")).toUpperCase();
+      if (!targetSymbol || targetSymbol === state.dragSymbol) return;
+      ev.preventDefault();
+      clearDragClasses();
+      var rect = this.getBoundingClientRect();
+      var isAfter = (ev.clientY - rect.top) > (rect.height / 2);
+      this.classList.add(isAfter ? "drop-after" : "drop-before");
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
+    });
+
+    rows[r].addEventListener("dragleave", function () {
+      this.classList.remove("drop-before");
+      this.classList.remove("drop-after");
+    });
+
+    rows[r].addEventListener("drop", function (ev) {
+      if (!state.dragSymbol) return;
+      ev.preventDefault();
+      var targetSymbol = safeText(this.getAttribute("data-symbol")).toUpperCase();
+      var rect = this.getBoundingClientRect();
+      var isAfter = (ev.clientY - rect.top) > (rect.height / 2);
+      clearDragClasses();
+      reorderSymbols(state.dragSymbol, targetSymbol, isAfter);
+      state.dragSymbol = null;
+    });
+
+    rows[r].addEventListener("dragend", function () {
+      clearDragClasses();
+      state.dragSymbol = null;
+    });
   }
 
   var activeEntry = getSymbolEntry();
   var note = document.getElementById("leftNote");
   var msg = safeText(activeEntry && activeEntry.error ? activeEntry.error : "").trim();
-  note.textContent = msg || "Loaded " + symbols.length + " symbol(s).";
+  note.textContent = msg || ("Loaded " + symbols.length + " symbol(s). Drag rows to reorder.");
 }
 
 function renderCards(symbolEntry, bucketData) {

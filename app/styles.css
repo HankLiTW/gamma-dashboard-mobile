@@ -132,12 +132,28 @@ body {
   cursor: pointer;
 }
 
+.snapshot-table tbody tr[draggable="true"] {
+  cursor: move;
+}
+
 .snapshot-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
 .snapshot-table tbody tr.active {
   background: var(--active-row);
+}
+
+.snapshot-table tbody tr.dragging {
+  opacity: 0.45;
+}
+
+.snapshot-table tbody tr.drop-before {
+  box-shadow: inset 0 2px 0 #0b84ff;
+}
+
+.snapshot-table tbody tr.drop-after {
+  box-shadow: inset 0 -2px 0 #0b84ff;
 }
 
 .badge {
