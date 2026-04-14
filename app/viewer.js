@@ -119,17 +119,20 @@ const baseConfig = {
 };
 
 function getSymbols() {
-  const symbols = (state.payload?.symbols || []).map((item) => safeText(item.symbol).toUpperCase()).filter(Boolean);
+  const root = state.payload || {};
+  const symbolsRaw = Array.isArray(root.symbols) ? root.symbols : [];
+  const symbols = symbolsRaw.map((item) => safeText(item.symbol).toUpperCase()).filter(Boolean);
   return symbols.sort();
 }
 
 function getSymbolEntry(sym = state.symbol) {
-  const symbols = state.payload?.symbols || [];
+  const root = state.payload || {};
+  const symbols = Array.isArray(root.symbols) ? root.symbols : [];
   return symbols.find((item) => safeText(item.symbol).toUpperCase() === safeText(sym).toUpperCase()) || null;
 }
 
 function getBucketData(symbolEntry, bucket = state.bucket) {
-  const buckets = symbolEntry?.buckets || {};
+  const buckets = symbolEntry && symbolEntry.buckets ? symbolEntry.buckets : {};
   if (buckets[bucket]) return buckets[bucket];
   if (buckets.core) return buckets.core;
   const keys = Object.keys(buckets);
@@ -137,7 +140,8 @@ function getBucketData(symbolEntry, bucket = state.bucket) {
 }
 
 function getMetric(symbolEntry, bucket = state.bucket) {
-  return getBucketData(symbolEntry, bucket)?.metric || {};
+  const bucketData = getBucketData(symbolEntry, bucket);
+  return bucketData && bucketData.metric ? bucketData.metric : {};
 }
 
 function getDefaultPriceRange(spot) {
@@ -163,7 +167,8 @@ function sourceBadgeText(source) {
 }
 
 function renderMeta() {
-  const meta = state.payload?.meta || {};
+  const root = state.payload || {};
+  const meta = root.meta || {};
   const finishedAt = parseTime(meta.finished_at);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
   const finishedText = finishedAt ? finishedAt.toLocaleString() : safeText(meta.finished_at || "-");
@@ -191,13 +196,14 @@ function renderSnapshotTable() {
   for (const sym of symbols) {
     const entry = getSymbolEntry(sym);
     const metric = getMetric(entry, state.bucket);
-    const badgeCls = sourceBadgeClass(entry?.source);
-    const badgeText = sourceBadgeText(entry?.source);
+    const source = entry ? entry.source : null;
+    const badgeCls = sourceBadgeClass(source);
+    const badgeText = sourceBadgeText(source);
     const activeCls = sym === state.symbol ? "active" : "";
     rows.push(`
       <tr data-symbol="${sym}" class="${activeCls}">
         <td class="symbol-cell">${sym}</td>
-        <td><span class="badge ${badgeCls}" title="${safeText(entry?.source) || "unknown"}">${badgeText}</span></td>
+        <td><span class="badge ${badgeCls}" title="${safeText(source) || "unknown"}">${badgeText}</span></td>
         <td>${fmtNum(metric.spot)}</td>
         <td>${safeText(metric.sign || "N/A")}</td>
         <td>${fmtBn(metric.net_gex)}</td>
@@ -222,14 +228,14 @@ function renderSnapshotTable() {
 
   const activeEntry = getSymbolEntry();
   const note = document.getElementById("leftNote");
-  const msg = safeText(activeEntry?.error || "").trim();
+  const msg = safeText(activeEntry && activeEntry.error ? activeEntry.error : "").trim();
   note.textContent = msg || `Loaded ${symbols.length} symbol(s).`;
 }
 
 function renderCards(symbolEntry, bucketData) {
-  const metric = bucketData?.metric || {};
-  const oi = symbolEntry?.oi_summary || {};
-  const source = safeText(symbolEntry?.source || "unknown");
+  const metric = bucketData && bucketData.metric ? bucketData.metric : {};
+  const oi = symbolEntry && symbolEntry.oi_summary ? symbolEntry.oi_summary : {};
+  const source = safeText(symbolEntry && symbolEntry.source ? symbolEntry.source : "unknown");
   document.getElementById("cardSpot").textContent = `Spot: ${fmtNum(metric.spot)}`;
   document.getElementById("cardSign").textContent = `Sign: ${safeText(metric.sign || "N/A")} | Net ${fmtBn(metric.net_gex)}`;
   document.getElementById("cardFlip").textContent = `Flip: ${fmtNum(metric.flip_price)} | Source: ${source}`;
@@ -237,10 +243,10 @@ function renderCards(symbolEntry, bucketData) {
 }
 
 function getOIRows(symbolEntry) {
-  const rows = Array.isArray(symbolEntry?.oi_rows) ? symbolEntry.oi_rows.slice() : [];
+  const rows = symbolEntry && Array.isArray(symbolEntry.oi_rows) ? symbolEntry.oi_rows.slice() : [];
   if (rows.length) return rows;
   const bucket = getBucketData(symbolEntry);
-  const fallback = Array.isArray(bucket?.top_oi) ? bucket.top_oi : [];
+  const fallback = bucket && Array.isArray(bucket.top_oi) ? bucket.top_oi : [];
   return fallback.map((row) => ({
     expiration: row.expiration,
     strike: row.strike,
@@ -250,7 +256,7 @@ function getOIRows(symbolEntry) {
 }
 
 function getAllExpirations(symbolEntry) {
-  const listed = Array.isArray(symbolEntry?.oi_expirations) ? symbolEntry.oi_expirations.slice() : [];
+  const listed = symbolEntry && Array.isArray(symbolEntry.oi_expirations) ? symbolEntry.oi_expirations.slice() : [];
   if (listed.length) {
     return listed.map((v) => safeText(v)).filter(Boolean).sort();
   }
@@ -381,8 +387,8 @@ function annotateLines(metric) {
 }
 
 function renderLevels(bucketData) {
-  const metric = bucketData?.metric || {};
-  const rows = Array.isArray(bucketData?.strike_profile) ? bucketData.strike_profile : [];
+  const metric = bucketData && bucketData.metric ? bucketData.metric : {};
+  const rows = bucketData && Array.isArray(bucketData.strike_profile) ? bucketData.strike_profile : [];
   if (!rows.length) {
     Plotly.newPlot(
       "levelsChart",
@@ -438,8 +444,8 @@ function renderLevels(bucketData) {
 }
 
 function renderFlip(bucketData) {
-  const metric = bucketData?.metric || {};
-  const curve = Array.isArray(bucketData?.gex_curve) ? bucketData.gex_curve : [];
+  const metric = bucketData && bucketData.metric ? bucketData.metric : {};
+  const curve = bucketData && Array.isArray(bucketData.gex_curve) ? bucketData.gex_curve : [];
   if (!curve.length) {
     Plotly.newPlot(
       "flipChart",
@@ -487,7 +493,7 @@ function renderFlip(bucketData) {
 }
 
 function renderTrend(bucketData) {
-  const history = Array.isArray(bucketData?.history) ? bucketData.history.slice() : [];
+  const history = bucketData && Array.isArray(bucketData.history) ? bucketData.history.slice() : [];
   if (!history.length) {
     Plotly.newPlot(
       "trendChart",
@@ -502,8 +508,10 @@ function renderTrend(bucketData) {
   }
 
   history.sort((a, b) => {
-    const ta = parseTime(a.finished_at)?.getTime() || 0;
-    const tb = parseTime(b.finished_at)?.getTime() || 0;
+    const taObj = parseTime(a.finished_at);
+    const tbObj = parseTime(b.finished_at);
+    const ta = taObj ? taObj.getTime() : 0;
+    const tb = tbObj ? tbObj.getTime() : 0;
     return ta - tb;
   });
 
@@ -542,7 +550,7 @@ function renderBucketCompare(symbolEntry) {
 
   for (const bucket of buckets) {
     const data = getBucketData(symbolEntry, bucket);
-    const rows = Array.isArray(data?.strike_profile) ? data.strike_profile : [];
+    const rows = data && Array.isArray(data.strike_profile) ? data.strike_profile : [];
     if (!rows.length) continue;
     traces.push({
       type: "scatter",
@@ -685,7 +693,7 @@ function renderOI(symbolEntry) {
 }
 
 function renderHeatmap(bucketData) {
-  const rows = Array.isArray(bucketData?.heatmap_history) ? bucketData.heatmap_history : [];
+  const rows = bucketData && Array.isArray(bucketData.heatmap_history) ? bucketData.heatmap_history : [];
   if (!rows.length) {
     Plotly.newPlot(
       "heatmapChart",
@@ -772,7 +780,10 @@ function renderHeatmap(bucketData) {
         type: "scatter",
         mode: "lines",
         x: times,
-        y: times.map((t) => spotByTime.get(t.toISOString()) ?? null),
+        y: times.map((t) => {
+          const key = t.toISOString();
+          return spotByTime.has(key) ? spotByTime.get(key) : null;
+        }),
         line: { color: "#111111", width: 2 },
         name: "Spot Path",
         hovertemplate: "Time %{x|%Y-%m-%d %H:%M}<br>Spot %{y:.2f}<extra></extra>",
