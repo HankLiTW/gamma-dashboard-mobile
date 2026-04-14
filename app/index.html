@@ -3,52 +3,122 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Gamma Mobile Viewer</title>
+    <title>Gamma Dashboard Mobile</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   </head>
   <body>
     <main class="page">
       <header class="header">
-        <h1>Gamma Mobile Viewer</h1>
+        <h1>Gamma Dashboard</h1>
         <div id="metaLine" class="meta">Loading...</div>
       </header>
 
-      <section class="controls">
-        <label for="symbolSelect">Symbol</label>
-        <select id="symbolSelect"></select>
-
-        <label for="bucketSelect">Bucket</label>
-        <select id="bucketSelect">
-          <option value="front">Front (0-7DTE)</option>
-          <option value="core" selected>Core (8-90DTE)</option>
-          <option value="medium">Medium (46-90DTE)</option>
-        </select>
+      <section class="toolbar">
+        <div class="control">
+          <label for="symbolSelect">Active Symbol</label>
+          <select id="symbolSelect"></select>
+        </div>
+        <div class="control">
+          <label for="bucketSelect">GEX Bucket</label>
+          <select id="bucketSelect">
+            <option value="front">Front GEX (0-7DTE)</option>
+            <option value="core" selected>Core GEX (8-90DTE)</option>
+            <option value="medium">Medium GEX (46-90DTE)</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="tabSelect">Quick Tab</label>
+          <select id="tabSelect">
+            <option value="levels">Levels Map</option>
+            <option value="flip">Flip Map</option>
+            <option value="trend">Trend</option>
+            <option value="buckets">3 Buckets</option>
+            <option value="oi">Highest OI</option>
+            <option value="heatmap">Gamma Heatmap</option>
+          </select>
+        </div>
       </section>
 
-      <section class="cards">
-        <div class="card" id="cardSpot">Spot: -</div>
-        <div class="card" id="cardSign">Sign: -</div>
-        <div class="card" id="cardFlip">Flip: -</div>
-        <div class="card" id="cardWalls">Walls: -</div>
-      </section>
+      <section class="workspace">
+        <aside class="panel left-panel">
+          <h2>Symbols + Snapshot</h2>
+          <div class="table-wrap">
+            <table id="snapshotTable" class="snapshot-table">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Src</th>
+                  <th>Spot</th>
+                  <th>Sign</th>
+                  <th>Net GEX</th>
+                  <th>CallW</th>
+                  <th>PutW</th>
+                  <th>Flip</th>
+                </tr>
+              </thead>
+              <tbody id="snapshotBody"></tbody>
+            </table>
+          </div>
+          <div id="leftNote" class="hint"></div>
+        </aside>
 
-      <section class="panel">
-        <h2>Levels Map</h2>
-        <div id="levelsChart" class="chart"></div>
-      </section>
+        <section class="panel right-panel">
+          <div class="cards">
+            <div class="card" id="cardSpot">Spot: -</div>
+            <div class="card" id="cardSign">Sign: -</div>
+            <div class="card" id="cardFlip">Flip: -</div>
+            <div class="card" id="cardWalls">Walls: -</div>
+          </div>
 
-      <section class="panel">
-        <h2>Flip Curve</h2>
-        <div id="flipChart" class="chart"></div>
-      </section>
+          <div class="oi-filter-block">
+            <label class="oi-label" for="oiExpirations">OI Expiration Filter</label>
+            <div class="oi-filter-shell">
+              <button id="oiAllBtn" class="small-btn" type="button">All</button>
+              <button id="oiNoneBtn" class="small-btn" type="button">None</button>
+              <div id="oiExpSummary" class="oi-exp-summary">All expirations</div>
+            </div>
+            <div id="oiExpirations" class="oi-expirations"></div>
+          </div>
 
-      <section class="panel">
-        <h2>Top OI</h2>
-        <div id="oiTableWrap"></div>
+          <section class="tabs" id="tabButtons">
+            <button class="tab-btn active" data-tab="levels" type="button">Levels Map</button>
+            <button class="tab-btn" data-tab="flip" type="button">Flip Map</button>
+            <button class="tab-btn" data-tab="trend" type="button">Trend</button>
+            <button class="tab-btn" data-tab="buckets" type="button">3 Buckets</button>
+            <button class="tab-btn" data-tab="oi" type="button">Highest OI</button>
+            <button class="tab-btn" data-tab="heatmap" type="button">Gamma Heatmap</button>
+          </section>
+
+          <section id="panel-levels" class="tab-panel active">
+            <div id="levelsChart" class="chart"></div>
+          </section>
+
+          <section id="panel-flip" class="tab-panel">
+            <div id="flipChart" class="chart"></div>
+          </section>
+
+          <section id="panel-trend" class="tab-panel">
+            <div id="trendChart" class="chart"></div>
+          </section>
+
+          <section id="panel-buckets" class="tab-panel">
+            <div id="bucketChart" class="chart"></div>
+          </section>
+
+          <section id="panel-oi" class="tab-panel">
+            <div id="oiChart" class="chart"></div>
+            <div id="oiTableWrap"></div>
+          </section>
+
+          <section id="panel-heatmap" class="tab-panel">
+            <div id="heatmapChart" class="chart"></div>
+          </section>
+
+          <div id="chartHint" class="hint chart-hint"></div>
+        </section>
       </section>
     </main>
     <script src="./viewer.js"></script>
   </body>
 </html>
-
