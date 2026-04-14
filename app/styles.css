@@ -40,6 +40,10 @@ body {
   font-size: 13px;
 }
 
+.snapshot-top {
+  margin-bottom: 10px;
+}
+
 .toolbar {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -90,9 +94,11 @@ body {
 }
 
 .left-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 520px;
+  min-height: 0;
+}
+
+.left-toolbar {
+  margin-bottom: 0;
 }
 
 .table-wrap {
@@ -305,13 +311,13 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .left-panel {
-    min-height: 320px;
+  .left-toolbar {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 900px) {
-  .toolbar {
+  .left-toolbar {
     grid-template-columns: 1fr;
   }
 
