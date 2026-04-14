@@ -40,10 +40,6 @@ body {
   font-size: 13px;
 }
 
-.snapshot-top {
-  margin-bottom: 10px;
-}
-
 .toolbar {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -78,7 +74,6 @@ body {
   display: grid;
   grid-template-columns: 520px minmax(0, 1fr);
   gap: 10px;
-  min-height: 500px;
 }
 
 .panel {
@@ -94,11 +89,8 @@ body {
 }
 
 .left-panel {
-  min-height: 0;
-}
-
-.left-toolbar {
-  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .table-wrap {
@@ -310,14 +302,10 @@ body {
   .workspace {
     grid-template-columns: 1fr;
   }
-
-  .left-toolbar {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 900px) {
-  .left-toolbar {
+  .toolbar {
     grid-template-columns: 1fr;
   }
 

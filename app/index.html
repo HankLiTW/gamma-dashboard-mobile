@@ -14,59 +14,53 @@
         <div id="metaLine" class="meta">Loading...</div>
       </header>
 
-      <section class="panel snapshot-top">
-        <h2>Symbols + Snapshot</h2>
-        <div class="table-wrap">
-          <table id="snapshotTable" class="snapshot-table">
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Src</th>
-                <th>Spot</th>
-                <th>Sign</th>
-                <th>Net GEX</th>
-                <th>CallW</th>
-                <th>PutW</th>
-                <th>Flip</th>
-              </tr>
-            </thead>
-            <tbody id="snapshotBody"></tbody>
-          </table>
+      <section class="toolbar">
+        <div class="control">
+          <label for="symbolSelect">Active Symbol</label>
+          <select id="symbolSelect"></select>
         </div>
-        <div id="leftNote" class="hint"></div>
+        <div class="control">
+          <label for="bucketSelect">GEX Bucket</label>
+          <select id="bucketSelect">
+            <option value="front">Front GEX (0-7DTE)</option>
+            <option value="core" selected>Core GEX (8-90DTE)</option>
+            <option value="medium">Medium GEX (46-90DTE)</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="tabSelect">Quick Tab</label>
+          <select id="tabSelect">
+            <option value="levels">Levels Map</option>
+            <option value="flip">Flip Map</option>
+            <option value="trend">Trend</option>
+            <option value="buckets">3 Buckets</option>
+            <option value="oi">Highest OI</option>
+            <option value="heatmap">Gamma Heatmap</option>
+          </select>
+        </div>
       </section>
 
       <section class="workspace">
         <aside class="panel left-panel">
-          <h2>Quick Controls</h2>
-          <section class="toolbar left-toolbar">
-            <div class="control">
-              <label for="symbolSelect">Active Symbol</label>
-              <select id="symbolSelect"></select>
-            </div>
-            <div class="control">
-              <label for="bucketSelect">GEX Bucket</label>
-              <select id="bucketSelect">
-                <option value="front">Front GEX (0-7DTE)</option>
-                <option value="core" selected>Core GEX (8-90DTE)</option>
-                <option value="medium">Medium GEX (46-90DTE)</option>
-              </select>
-            </div>
-            <div class="control">
-              <label for="tabSelect">Quick Tab</label>
-              <select id="tabSelect">
-                <option value="levels">Levels Map</option>
-                <option value="flip">Flip Map</option>
-                <option value="trend">Trend</option>
-                <option value="buckets">3 Buckets</option>
-                <option value="oi">Highest OI</option>
-                <option value="heatmap">Gamma Heatmap</option>
-              </select>
-            </div>
-          </section>
-          <div class="hint">
-            Click a symbol in the top table to update charts.
+          <h2>Symbols + Snapshot</h2>
+          <div class="table-wrap">
+            <table id="snapshotTable" class="snapshot-table">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Src</th>
+                  <th>Spot</th>
+                  <th>Sign</th>
+                  <th>Net GEX</th>
+                  <th>CallW</th>
+                  <th>PutW</th>
+                  <th>Flip</th>
+                </tr>
+              </thead>
+              <tbody id="snapshotBody"></tbody>
+            </table>
           </div>
+          <div id="leftNote" class="hint"></div>
         </aside>
 
         <section class="panel right-panel">
